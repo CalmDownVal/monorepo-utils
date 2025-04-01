@@ -1,0 +1,56 @@
+name: Verify And Build
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  verify_and_build:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Get Yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+
+    - name: Setup Yarn cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+
+    - name: TypeScript check
+      run: yarn run typecheck
+
+    - name: ESLint check
+      run: yarn run lint
+
+    - name: Build the project
+      run: yarn run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        retention-days: 7
+        path: build/
+
+  summary:
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && secrets.WEBHOOK_DISCORD != '' }}
+    needs: [ verify_and_build ]
+    steps:
+
+    - name: Trigger Webhook
+      uses: CalmDownVal/webhook-summary@v1
+      with:
+        token: ${{ github.token }}
+        url: ${{ secrets.WEBHOOK_DISCORD }}

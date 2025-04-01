@@ -1,0 +1,21 @@
+{
+	"root": true,
+	"extends": [
+		"@calmdownval/eslint-config/js",
+		"@calmdownval/eslint-config/js/stylistic",
+		"@calmdownval/eslint-config/js/import",
+		"@calmdownval/eslint-config/ts",
+		"@calmdownval/eslint-config/ts/stylistic",
+		"@calmdownval/eslint-config/ts/import"
+	],
+	"parserOptions": {
+		"project": "./packages/*/tsconfig.json"
+	},
+	"settings": {
+		"import/resolver": {
+			"@calmdownval/eslint-import-resolver": {
+				"project": "./packages/*/tsconfig.json"
+			}
+		}
+	}
+}

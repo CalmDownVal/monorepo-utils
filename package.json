@@ -1,0 +1,21 @@
+{
+	"name": "monorepo-utils",
+	"private": true,
+	"packageManager": "yarn@4.8.1",
+	"workspaces": [
+		"packages/*"
+	],
+	"devDependencies": {
+		"@calmdownval/eslint-config": "2.1.4",
+		"@calmdownval/eslint-import-resolver": "1.1.2",
+		"@stylistic/eslint-plugin-js": "4.2.0",
+		"@stylistic/eslint-plugin-plus": "4.2.0",
+		"@stylistic/eslint-plugin-ts": "4.2.0",
+		"@typescript-eslint/eslint-plugin": "8.29.0",
+		"@typescript-eslint/parser": "8.29.0",
+		"eslint": "9.23.0",
+		"eslint-plugin-import": "2.31.0",
+		"tslib": "2.8.1",
+		"typescript": "5.8.2"
+	}
+}
