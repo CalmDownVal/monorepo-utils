@@ -35,6 +35,7 @@ export type DependencyMapKey =
 const DEFAULT_DEPENDENCY_MAPS: DependencyMapKey[] = [
 	"dependencies",
 	"devDependencies",
+	"peerDependencies",
 ];
 
 function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
@@ -92,7 +93,7 @@ function createTraversal(
 	direction: "push" | "unshift",
 ): DependencyTraversal {
 	return options => {
-		const graph = buildGraph(options.workspace);
+		const graph = buildGraph(options.workspace, options);
 		const origin = graph[options.moduleName];
 		if (!origin) {
 			throw new Error(`No module '${options.moduleName}' could be found in the workspace.`);
@@ -131,9 +132,11 @@ function createTraversal(
 			node.visiting = false;
 			node.visited = true;
 
-			if (node !== origin && options.includeSelf !== false) {
+			if (node !== origin || options.includeSelf !== false) {
 				result[direction](node.module);
 			}
+
+			return true;
 		};
 
 		visit(origin);

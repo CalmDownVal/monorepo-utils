@@ -11,6 +11,7 @@ export {
 	type PluginConfigBlock,
 	type PluginConfigOverrideBlock,
 	type PluginFactoryBuilder,
+	type PluginFactory,
 	type PluginConfigurationBuilder,
 	type NameOf,
 	type ConfigOf,

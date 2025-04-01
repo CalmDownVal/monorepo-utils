@@ -1,7 +1,9 @@
+import { resolve } from "node:path";
+
 import { rollup, type OutputOptions as TargetConfig } from "rollup";
 
 import type { AnyPlugin, ConfigOf, NameOf, PluginConfigOverrideBlock, PluginMap } from "./Plugin";
-import { getContext, type BuildContext } from "./BuildContext";
+import { runBuild, type BuildContext } from "./BuildContext";
 
 export interface Target<TName extends string, TPlugins extends PluginMap> {
 	readonly name: TName;
@@ -15,7 +17,7 @@ export interface Target<TName extends string, TPlugins extends PluginMap> {
 	/** @internal */
 	readonly configure: TargetConfigBlock;
 
-	build(): Promise<void>;
+	build(): void;
 
 	entry(
 		unit: string,
@@ -106,23 +108,23 @@ function configureTarget(
 	};
 }
 
-async function buildTarget(
+function buildTarget(
 	this: Target<any, any>,
 ) {
-	const context = getContext();
-	process.chdir(context.cwd);
+	runBuild(async context => {
+		const inputConfig = {
+			input: this.entries,
+			plugins: Promise.all(this.plugins.map(async it => {
+				const pluginConfig = await it.configure(context);
+				const factory = await it.factory(context);
+				return factory(pluginConfig);
+			}))
+		};
 
-	const bundle = await rollup({
-		input: this.entries,
-		plugins: Promise.all(this.plugins.map(async it => {
-			const pluginConfig = await it.configure(context);
-			const instance = await it.factory(pluginConfig, context);
-			return instance;
-		}))
+		const bundle = await rollup(inputConfig);
+		const outputConfig = await this.configure(context);
+		await bundle.write(outputConfig);
 	});
-
-	const outputConfig = await this.configure(context);
-	bundle.write(outputConfig);
 }
 
 function addTargetEntry(
