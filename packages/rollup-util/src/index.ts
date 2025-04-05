@@ -1,28 +1,11 @@
-export {
-	build,
-	type BuildContext,
-	type TargetEnv,
-} from "./BuildContext";
+export { build, inEnvs } from "./BuildContext";
+export { declarePlugin } from "./PluginDeclaration";
+export { declareTarget } from "./TargetDeclaration";
 
-export {
-	declarePlugin,
-	type Plugin,
-	type PluginFactoryBlock,
-	type PluginConfigBlock,
-	type PluginConfigOverrideBlock,
-	type PluginFactoryBuilder,
-	type PluginFactory,
-	type PluginConfigurationBuilder,
-	type NameOf,
-	type ConfigOf,
-	type AnyPlugin,
-	type PluginMap,
-} from "./Plugin";
-
-export {
-	declareTarget,
-	type Target,
-	type TargetConfigBlock,
-	type TargetConfigOverrideBlock,
-	type TargetBuilder,
-} from "./Target";
+export type * from "./BuildContext";
+export type * from "./Entity";
+export type * from "./EntityContainer";
+export type * from "./OutputDeclaration";
+export type * from "./PipelineDeclaration";
+export type * from "./PluginDeclaration";
+export type * from "./TargetDeclaration";
