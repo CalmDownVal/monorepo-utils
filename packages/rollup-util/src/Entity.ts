@@ -20,11 +20,11 @@ export type Entity<TName extends string, TConfig extends object, TBase = {}> = T
 	): Entity<TName, TConfig, TBase>;
 
 	disable(
-		configurator: Configurator<boolean>,
+		configurator?: Configurator<boolean>,
 	): Entity<TName, TConfig, TBase>;
 
 	configure(
-		configurator: Configurator<TConfig>,
+		configurator?: Configurator<TConfig>,
 	): Entity<TName, TConfig, TBase>;
 }
 
@@ -82,7 +82,7 @@ function onFinalize(
 
 function onEnable(
 	this: AnyEntity,
-	configurator: Configurator<boolean>,
+	configurator: Configurator<boolean> = defaultGetEnabled,
 ): AnyEntity {
 	const prev = this.getEnabled;
 	const next: Configurator<boolean> = async (currentConfig, context) => (
@@ -102,7 +102,7 @@ function onEnable(
 
 function onDisable(
 	this: AnyEntity,
-	configurator: Configurator<boolean>,
+	configurator: Configurator<boolean> = defaultGetEnabled,
 ): AnyEntity {
 	const prev = this.getEnabled;
 	const next: Configurator<boolean> = async (currentConfig, context) => (
