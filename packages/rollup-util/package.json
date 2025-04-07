@@ -1,6 +1,6 @@
 {
 	"name": "@calmdownval/rollup-util",
-	"version": "1.0.0",
+	"version": "1.0.0-alpha.1",
 	"license": "ISC",
 	"exports": {
 		".": {
@@ -9,7 +9,7 @@
 		}
 	},
 	"peerDependencies": {
-		"@calmdownval/workspaces-util": "1.0.0",
+		"@calmdownval/workspaces-util": "1.0.0-alpha.1",
 		"rollup": "4.38.0"
 	},
 	"devDependencies": {

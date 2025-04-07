@@ -3,6 +3,7 @@ import type { Module, Workspace } from "./types";
 export interface GraphOptions {
 	readonly workspace: Workspace;
 	readonly dependencyMaps?: readonly DependencyMapKey[];
+	readonly exclude?: readonly string[];
 }
 
 export interface TraversalOptions extends GraphOptions {
@@ -11,7 +12,24 @@ export interface TraversalOptions extends GraphOptions {
 }
 
 export interface DependencyTraversal {
-	(options: TraversalOptions): Module[];
+	(options: TraversalOptions): TraversalResult;
+}
+
+export interface TraversalResult {
+	buildOrder: GraphNode[];
+	root: GraphNode;
+}
+
+export interface GraphNode {
+	module: Module;
+	dependencies: GraphNode[];
+	dependents: GraphNode[];
+
+	/** @internal */
+	visited?: boolean;
+
+	/** @internal */
+	visiting?: boolean;
 }
 
 /**
@@ -38,6 +56,8 @@ const DEFAULT_DEPENDENCY_MAPS: DependencyMapKey[] = [
 	"peerDependencies",
 ];
 
+type Graph = { [TModuleName in string]?: GraphNode };
+
 function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 	const { modules } = workspace;
 	const moduleCount = modules.length;
@@ -57,6 +77,10 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 
 	const mapKeys = options?.dependencyMaps ?? DEFAULT_DEPENDENCY_MAPS;
 	const mapCount = mapKeys.length;
+	const excluded = options?.exclude?.reduce<{ [K in string]?: true }>((map, name) => {
+		map[name] = true;
+		return map;
+	}, {}) ?? {};
 
 	let mapIndex;
 	let moduleSubIndex;
@@ -66,8 +90,11 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 
 	for (moduleIndex = 0; moduleIndex < moduleCount; moduleIndex += 1) {
 		module = modules[moduleIndex];
-		upstream = graph[module.declaration.name]!;
+		if (excluded[module.declaration.name] === true) {
+			continue;
+		}
 
+		upstream = graph[module.declaration.name]!;
 		for (mapIndex = 0; mapIndex < mapCount; mapIndex += 1) {
 			if (!(dependencyMap = module.declaration[mapKeys[mapIndex]])) {
 				continue;
@@ -75,7 +102,9 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 
 			for (moduleSubIndex = 0; moduleSubIndex < moduleCount; moduleSubIndex += 1) {
 				downstream = graph[modules[moduleSubIndex].declaration.name]!;
-				if (dependencyMap[downstream.module.declaration.name]?.startsWith("workspace:") !== true) {
+				if (excluded[downstream.module.declaration.name] === true ||
+					dependencyMap[downstream.module.declaration.name]?.startsWith("workspace:") !== true
+				) {
 					continue;
 				}
 
@@ -99,7 +128,7 @@ function createTraversal(
 			throw new Error(`No module '${options.moduleName}' could be found in the workspace.`);
 		}
 
-		const result: Module[] = [];
+		const buildOrder: GraphNode[] = [];
 		let cycleStart: GraphNode | null = null;
 		let cycleInfo = "";
 
@@ -133,23 +162,29 @@ function createTraversal(
 			node.visited = true;
 
 			if (node !== origin || options.includeSelf !== false) {
-				result[direction](node.module);
+				buildOrder[direction](node);
 			}
 
 			return true;
 		};
 
 		visit(origin);
-		return result;
+
+		// filter the results to the requested scope
+		const affected = new WeakSet<GraphNode>();
+		buildOrder.forEach(node => {
+			affected.add(node);
+		});
+
+		const isAffected = (node: GraphNode) => affected.has(node);
+		buildOrder.forEach(node => {
+			node.dependencies = node.dependencies.filter(isAffected);
+			node.dependents = node.dependents.filter(isAffected);
+		});
+
+		return {
+			buildOrder,
+			root: origin,
+		};
 	};
-}
-
-type Graph = { [TModuleName in string]?: GraphNode };
-
-interface GraphNode {
-	module: Module;
-	dependencies: GraphNode[];
-	dependents: GraphNode[];
-	visited?: boolean;
-	visiting?: boolean;
 }

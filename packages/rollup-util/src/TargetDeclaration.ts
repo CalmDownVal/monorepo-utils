@@ -32,7 +32,7 @@ export type TargetDeclaration<
 	): TargetDeclaration<TName, TConfig, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
 
 	build(
-		block?: (target: Target<TName, TConfig, TPipelines>) => void,
+		block: (target: Target<TName, TConfig, TPipelines>) => void,
 	): void;
 }>;
 
@@ -130,12 +130,12 @@ const DEFAULT_CONFIG: OutputOptions = {
 
 function onBuild(
 	this: AnyTargetDeclaration,
-	block?: (target: AnyTarget) => void,
+	block: (target: AnyTarget) => void,
 ): void {
 	const target = this.finalize();
 	buildTask(async context => {
-		block?.(target);
-		if (await isDisabled(target, context)) {
+		block(target);
+		if (!hasEntries(target) || await isDisabled(target, context)) {
 			return [];
 		}
 
@@ -165,6 +165,7 @@ function onBuild(
 			}
 
 			return {
+				name: `${target.name} · ${pipeline.name}`,
 				outputs: pipelineOutputs,
 				input: {
 					input: target.entries,
@@ -173,6 +174,12 @@ function onBuild(
 			};
 		});
 	});
+}
+
+function hasEntries(
+	target: AnyTargetDeclaration,
+): boolean {
+	return !!target.entries && Object.keys(target.entries).length > 0;
 }
 
 async function isDisabled(

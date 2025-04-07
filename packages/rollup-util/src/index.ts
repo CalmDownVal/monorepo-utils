@@ -1,4 +1,4 @@
-export { build, inEnvs } from "./BuildContext";
+export { build, inEnv } from "./BuildContext";
 export { declarePlugin } from "./PluginDeclaration";
 export { declareTarget } from "./TargetDeclaration";
 
