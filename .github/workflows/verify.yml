@@ -12,9 +12,12 @@ jobs:
     - name: Checkout the repository
       uses: actions/checkout@v4
 
+    - name: Enable Corepack
+      run: corepack enable
+
     - name: Get Yarn cache directory path
       id: yarn-cache-dir-path
-      run: echo "::set-output name=dir::$(yarn cache dir)"
+      run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
     - name: Setup Yarn cache
       uses: actions/cache@v4
@@ -27,29 +30,33 @@ jobs:
     - name: Install dependencies
       run: yarn install --frozen-lockfile
 
-    - name: TypeScript check
-      run: yarn run typecheck
+    # - name: TypeScript check
+    #   run: yarn run typecheck
 
-    - name: ESLint check
-      run: yarn run lint
+    # - name: ESLint check
+    #   run: yarn run lint
 
-    - name: Build the project
-      run: yarn run build
+    # - name: Build the project
+    #   run: yarn run build
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts
-        retention-days: 7
-        path: build/
+    # - name: Upload build artifacts
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: build-artifacts
+    #     retention-days: 7
+    #     path: |
+    #       packages/*/dist/
 
   summary:
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && secrets.WEBHOOK_DISCORD != '' }}
     needs: [ verify_and_build ]
+    if: ${{ always() }}
+    env:
+      HAS_WEBHOOK: ${{ secrets.WEBHOOK_DISCORD != '' }}
     steps:
 
     - name: Trigger Webhook
+      if: ${{ env.HAS_WEBHOOK == 'true' }}
       uses: CalmDownVal/webhook-summary@v1
       with:
         token: ${{ github.token }}

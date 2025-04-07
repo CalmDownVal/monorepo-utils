@@ -78,7 +78,7 @@ __metadata:
     tslib: "npm:2.8.1"
     typescript: "npm:5.8.2"
   peerDependencies:
-    "@calmdownval/workspaces-util": 1.0.0
+    "@calmdownval/workspaces-util": 1.0.0-alpha.2
     rollup: 4.38.0
   languageName: unknown
   linkType: soft
