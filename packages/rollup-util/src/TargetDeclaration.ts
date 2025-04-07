@@ -55,10 +55,6 @@ export type AnyTarget = (
 	Target<any, any, any>
 );
 
-export type PipelinesOf<TTarget extends AnyTargetDeclaration> = (
-	TTarget extends TargetDeclaration<any, any, infer TPipelines> ? TPipelines : {}
-);
-
 export function declareTarget<TName extends string, TTarget extends AnyTargetDeclaration>(
 	name: TName,
 	block: (target: TargetDeclaration<TName, OutputConfig, {}>) => TTarget,

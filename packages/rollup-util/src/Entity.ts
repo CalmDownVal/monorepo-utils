@@ -37,11 +37,11 @@ export type AnyEntity = (
 );
 
 export type NameOf<TEntity extends AnyEntity> = (
-	TEntity extends Entity<infer TName, any, any> ? TName : string
+	TEntity extends Entity<infer TName, any, {}> ? TName : string
 );
 
 export type ConfigOf<TEntity extends AnyEntity> = (
-	TEntity extends Entity<any, infer TConfig, any> ? TConfig : unknown
+	TEntity extends Entity<any, infer TConfig, {}> ? TConfig : unknown
 );
 
 export function createEntity<TName extends string, TConfig extends object, TBase>(
