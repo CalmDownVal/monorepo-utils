@@ -122,7 +122,7 @@ function onPipeline(
 }
 
 const DEFAULT_CONFIG: OutputOptions = {
-	dir: "./build",
+	dir: "./dist",
 	entryFileNames: "[name].js",
 	format: "es",
 	sourcemap: true,
