@@ -20,6 +20,9 @@ export type TargetDeclaration<
 	/** @internal */
 	readonly pipelineContainer: EntityContainer<AnyPipelineDeclaration, TPipelines>;
 
+	/** @interface */
+	readonly suppressed: Set<string>;
+
 	/** @internal */
 	entry(
 		unit: string,
@@ -30,6 +33,10 @@ export type TargetDeclaration<
 		name: TPipelineName,
 		block: (pipeline: PipelineDeclaration<TPipelineName, TConfig, {}, {}>) => TPipeline,
 	): TargetDeclaration<TName, TConfig, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
+
+	suppress(
+		code: string,
+	): Target<TName, TConfig, TPipelines>;
 
 	build(
 		block: (target: Target<TName, TConfig, TPipelines>) => void,
@@ -64,9 +71,11 @@ export function declareTarget<TName extends string, TTarget extends AnyTargetDec
 		createEntity(name, {
 			pipelines: pipelineContainer.entityMap,
 			pipelineContainer,
+			suppressed: new Set(),
 			finalize: onFinalize,
 			entry: onEntry,
 			pipeline: onPipeline,
+			suppress: onSuppress,
 			build: onBuild,
 		}),
 	);
@@ -117,6 +126,14 @@ function onPipeline(
 	};
 }
 
+function onSuppress(
+	this: AnyTargetDeclaration,
+	code: string,
+): AnyTargetDeclaration {
+	this.suppressed.add(code);
+	return this;
+}
+
 const DEFAULT_CONFIG: OutputOptions = {
 	dir: "./dist",
 	entryFileNames: "[name].js",
@@ -162,6 +179,7 @@ function onBuild(
 
 			return {
 				name: `${target.name} · ${pipeline.name}`,
+				suppressed: target.suppressed,
 				outputs: pipelineOutputs,
 				input: {
 					input: target.entries,
@@ -190,7 +208,7 @@ function collectPlugins(
 	context: BuildContext,
 ): Promise<Plugin[]> {
 	return container.collect(async plugin => {
-		if (!(await plugin.getEnabled(true, context))) {
+		if (await isDisabled(plugin, context)) {
 			return null;
 		}
 

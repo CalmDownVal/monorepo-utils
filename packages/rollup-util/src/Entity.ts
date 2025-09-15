@@ -16,7 +16,7 @@ export type Entity<TName extends string, TConfig extends object, TBase = {}> = T
 	finalize(): Entity<TName, TConfig, TBase>;
 
 	enable(
-		configurator: Configurator<boolean>,
+		configurator?: Configurator<boolean>,
 	): Entity<TName, TConfig, TBase>;
 
 	disable(
@@ -26,6 +26,10 @@ export type Entity<TName extends string, TConfig extends object, TBase = {}> = T
 	configure(
 		configurator?: Configurator<TConfig>,
 	): Entity<TName, TConfig, TBase>;
+}
+
+export interface ConfiguratorContext<TConfig> extends BuildContext {
+	readonly config: TConfig | null;
 }
 
 export interface Configurator<TConfig> {
@@ -65,6 +69,10 @@ function defaultGetEnabled() {
 	return true;
 }
 
+function defaultGetDisabled() {
+	return false;
+}
+
 function defaultGetConfig(config?: any) {
 	return config;
 }
@@ -102,7 +110,7 @@ function onEnable(
 
 function onDisable(
 	this: AnyEntity,
-	configurator: Configurator<boolean> = defaultGetEnabled,
+	configurator: Configurator<boolean> = defaultGetDisabled,
 ): AnyEntity {
 	const prev = this.getEnabled;
 	const next: Configurator<boolean> = async (currentConfig, context) => (
@@ -125,9 +133,10 @@ function onConfigure(
 	configurator: Configurator<any>,
 ): AnyEntity {
 	const prev = this.getConfig;
-	const next: Configurator<any> = async (currentConfig, context) => (
-		configurator(await prev(currentConfig, context), context)
-	);
+	const next: Configurator<any> = async (currentConfig, context) => ({
+		...currentConfig,
+		...(await configurator(await prev(currentConfig, context), context)),
+	});
 
 	if (this.isFinal) {
 		this.getConfig = next;

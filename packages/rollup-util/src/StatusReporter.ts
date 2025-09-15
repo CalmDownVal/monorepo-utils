@@ -21,6 +21,7 @@ export type StatusKind =
 	| "pending"
 	| "queued"
 	| "success"
+	| "skipped"
 	| "unknown";
 
 interface StatusNode extends GraphNode {
@@ -80,12 +81,17 @@ function onUpdate(this: StatusReporter, node: GraphNode, status: StatusInfo) {
 
 
 const Icon: Record<StatusKind, string> = {
-	error:   "❌",
-	pending: "🔨",
-	queued:  "💤",
-	success: "✅",
-	unknown: "❓",
+	error:   color("FAIL", "0;31m"),
+	pending: color("BUSY", "0;36m"),
+	queued:  color("IDLE", "0;33m"),
+	success: color("PASS", "0;32m"),
+	skipped: color("SKIP", "0;33m"),
+	unknown: color("????", "0;33m"),
 };
+
+function color(text: string, color: string) {
+	return `\u001b[${color}${text}\u001b[0m`;
+}
 
 function formatStatusTree(
 	node: StatusNode,

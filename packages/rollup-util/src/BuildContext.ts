@@ -1,3 +1,4 @@
+import { access, constants as FSConstants } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -26,6 +27,7 @@ export function inEnv(...envs: TargetEnv[]): Configurator<any> {
 /** @internal */
 export interface BuildTarget {
 	readonly name: string;
+	readonly suppressed: Set<string>;
 	readonly input: InputOptions;
 	readonly outputs: readonly OutputOptions[];
 }
@@ -55,6 +57,16 @@ const ENV_MAP: { readonly [K in string]?: TargetEnv } = {
 	prod: "prod",
 	production: "prod",
 };
+
+async function canAccessFile(path: string, mode: number = FSConstants.R_OK) {
+	try {
+		await access(path, mode);
+		return true;
+	}
+	catch (_ex) {
+		return false;
+	}
+}
 
 export async function build(cwd: string = process.cwd()) {
 	const buildStartTime = Date.now();
@@ -93,13 +105,18 @@ export async function build(cwd: string = process.cwd()) {
 				targetEnv,
 			};
 
-			let target: BuildTarget | null = null;
 			try {
 				// import the build.config.mjs definition file
 				currentTasks = [];
 				process.chdir(context.cwd);
 
-				const url = pathToFileURL(join(context.cwd, "build.config.mjs")).href;
+				const buildConfigPath = join(context.cwd, "build.config.mjs");
+				if (!(await canAccessFile(buildConfigPath))) {
+					status.update(currentNode, { kind: "skipped" });
+					continue;
+				}
+
+				const url = pathToFileURL(buildConfigPath).href;
 				await import(url);
 
 				// process queued tasks
@@ -111,14 +128,21 @@ export async function build(cwd: string = process.cwd()) {
 					.flat(1);
 
 				// build targets sequentially
-				for (target of targets) {
+				for (const target of targets) {
 					const bundle = await rollup({
 						...target.input,
 						onLog(level, log) {
 							if (level !== "debug") {
 								status.log(currentNode, log.message);
 							}
-						}
+						},
+						onwarn(warning, handler) {
+							if (warning.code !== undefined && target.suppressed.has(warning.code)) {
+								return;
+							}
+
+							handler(warning);
+						},
 					});
 
 					for (const output of target.outputs) {
