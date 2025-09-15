@@ -18,9 +18,16 @@ export type PipelineDeclaration<
 	/** @internal */
 	readonly outputContainer: EntityContainer<AnyOutputDeclaration, TOutputs>;
 
+	/** @interface */
+	readonly suppressed: Set<string>;
+
 	plugin<TPlugin extends AnyPluginDeclaration>(
 		plugin: TPlugin,
 	): PipelineDeclaration<TName, TConfig, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }, TOutputs>;
+
+	suppress(
+		code: string,
+	): PipelineDeclaration<TName, TConfig, TPlugins, TOutputs>;
 
 	output<TOutputName extends string, TOutput extends AnyOutputDeclaration>(
 		name: TOutputName,
@@ -40,10 +47,12 @@ export function declarePipeline<TName extends string, TConfig extends OutputConf
 	return createEntity(name, {
 		plugins: pluginContainer.entityMap,
 		outputs: outputContainer.entityMap,
+		suppressed: new Set(),
 		pluginContainer,
 		outputContainer,
 		finalize: onFinalize,
 		plugin: onPlugin,
+		suppress: onSuppress,
 		output: onOutput,
 	});
 }
@@ -78,6 +87,14 @@ function onPlugin(
 		plugins: pluginContainer.entityMap,
 		pluginContainer,
 	};
+}
+
+function onSuppress(
+	this: AnyPipelineDeclaration,
+	code: string,
+): AnyPipelineDeclaration {
+	this.suppressed.add(code);
+	return this;
 }
 
 function onOutput(

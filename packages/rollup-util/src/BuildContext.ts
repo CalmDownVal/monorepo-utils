@@ -132,16 +132,13 @@ export async function build(cwd: string = process.cwd()) {
 					const bundle = await rollup({
 						...target.input,
 						onLog(level, log) {
-							if (level !== "debug") {
-								status.log(currentNode, log.message);
-							}
-						},
-						onwarn(warning, handler) {
-							if (warning.code !== undefined && target.suppressed.has(warning.code)) {
+							if (log.code !== undefined && target.suppressed.has(log.code)) {
 								return;
 							}
 
-							handler(warning);
+							if (level !== "debug") {
+								status.log(currentNode, log.message);
+							}
 						},
 					});
 
