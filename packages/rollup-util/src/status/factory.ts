@@ -8,11 +8,11 @@ import { formatTime, print, println } from "./common";
 type StatusReporterExt = StatusReporter & {
 	readonly ci: boolean;
 	readonly status: WeakMap<GraphNode, StatusInfo>;
-	lineCount: number;
+	linesToClear: number;
 	lastLogNode?: GraphNode;
 
 	ansi: (text: string, code: string) => string
-	clear: () => void
+	clearTree: () => void
 	printTree: () => void
 };
 
@@ -22,15 +22,15 @@ export function createStatusReporter(root: GraphNode): StatusReporter {
 		ci,
 		status: new WeakMap(),
 		root,
-		lineCount: 0,
+		linesToClear: 0,
 		ansi: ci
 			? (text) => text
 			: (text, code) => `\u001b[${code}${text}\u001b[0m`,
 
 		log: onLog,
 		update: onUpdate,
-		clear: onClear,
 		close: onClose,
+		clearTree: onClearTree,
 		printTree: onPrintTree,
 	};
 
@@ -57,9 +57,29 @@ const StatusColor: Record<StatusKind, string> = {
 	SKIP: ANSI_YELLOW,
 };
 
-function onClear(this: StatusReporterExt) {
-	if (!this.ci && this.lineCount > 0) {
-		print(`\u001b[${this.lineCount + 1}A\r\u001b[0J`);
+function onLog(this: StatusReporterExt, node: GraphNode, message: string) {
+	this.clearTree();
+	if (this.lastLogNode !== node) {
+		const header = node.module.declaration.name;
+		println(this.ansi(header, ANSI_BOLD));
+		println(`┌${"─".repeat(header.length - 1)}`);
+
+		this.lastLogNode = node;
+	}
+
+	print("│ ");
+	println(message.replaceAll(/(\r\n|\n|\r)/g, `${EOL}│ `));
+
+	if (!this.ci) {
+		this.printTree();
+	}
+}
+
+function onUpdate(this: StatusReporterExt, node: GraphNode, status: StatusInfo) {
+	this.status.set(node, status);
+	if (!this.ci) {
+		this.clearTree();
+		this.printTree();
 	}
 }
 
@@ -69,29 +89,10 @@ function onClose(this: StatusReporterExt) {
 	}
 }
 
-function onLog(this: StatusReporterExt, node: GraphNode, message: string) {
-	this.clear();
-	if (this.lastLogNode !== node) {
-		const header = node.module.declaration.name;
-		println(`${EOL}${this.ansi(header, ANSI_BOLD)}${EOL}┌${"─".repeat(header.length - 1)}`);
-
-		this.lastLogNode = node;
-	}
-
-	print("│ ")
-	print(message.replaceAll(/(\r\n|\n|\r)/g, `${EOL}│ `));
-
-	if (!this.ci) {
-		println();
-		this.printTree();
-	}
-}
-
-function onUpdate(this: StatusReporterExt, node: GraphNode, status: StatusInfo) {
-	this.status.set(node, status);
-	if (!this.ci) {
-		this.clear();
-		this.printTree();
+function onClearTree(this: StatusReporterExt) {
+	if (!this.ci && this.linesToClear > 0) {
+		print(`\u001b[${this.linesToClear}A\r\u001b[0J`);
+		this.linesToClear = 0;
 	}
 }
 
@@ -141,7 +142,7 @@ function onPrintTree(
 	}
 
 	if (node === this.root) {
-		this.lineCount = lineCount;
+		this.linesToClear += lineCount + 1;
 		println();
 		print(output);
 		return null!;

@@ -24,7 +24,7 @@ export type Entity<TName extends string, TConfig extends object, TBase = {}> = T
 	): Entity<TName, TConfig, TBase>;
 
 	configure(
-		configurator?: Configurator<TConfig>,
+		configurator: Configurator<TConfig>,
 	): Entity<TName, TConfig, TBase>;
 }
 
@@ -55,7 +55,7 @@ export function createEntity<TName extends string, TConfig extends object, TBase
 	return {
 		name,
 		isFinal: false,
-		getEnabled: defaultGetEnabled,
+		getEnabled: defaultTruthy,
 		getConfig: defaultGetConfig,
 		finalize: onFinalize,
 		enable: onEnable,
@@ -65,12 +65,8 @@ export function createEntity<TName extends string, TConfig extends object, TBase
 	} satisfies Entity<TName, TConfig, {}> as any;
 }
 
-function defaultGetEnabled() {
+function defaultTruthy() {
 	return true;
-}
-
-function defaultGetDisabled() {
-	return false;
 }
 
 function defaultGetConfig(config?: any) {
@@ -90,7 +86,7 @@ function onFinalize(
 
 function onEnable(
 	this: AnyEntity,
-	configurator: Configurator<boolean> = defaultGetEnabled,
+	configurator: Configurator<boolean> = defaultTruthy,
 ): AnyEntity {
 	const prev = this.getEnabled;
 	const next: Configurator<boolean> = async (currentConfig, context) => (
@@ -110,7 +106,7 @@ function onEnable(
 
 function onDisable(
 	this: AnyEntity,
-	configurator: Configurator<boolean> = defaultGetDisabled,
+	configurator: Configurator<boolean> = defaultTruthy,
 ): AnyEntity {
 	const prev = this.getEnabled;
 	const next: Configurator<boolean> = async (currentConfig, context) => (
