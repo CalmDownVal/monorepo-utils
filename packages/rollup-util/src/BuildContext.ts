@@ -6,7 +6,7 @@ import { discoverModule, discoverWorkspace, getDependencies, type GraphNode, typ
 import { rollup, type InputOptions, type OutputOptions } from "rollup";
 
 import type { Configurator } from "./Entity";
-import { createStatusReporter, formatTime, print } from "./status";
+import { createStatusReporter, formatTime, println, type StatusReporter } from "./status";
 
 export interface BuildContext {
 	readonly cwd: string;
@@ -70,6 +70,8 @@ async function canAccessFile(path: string, mode: number = FSConstants.R_OK) {
 
 export async function build(cwd: string = process.cwd()) {
 	const buildStartTime = Date.now();
+	let status: StatusReporter | undefined;
+
 	try {
 		// get the origin module to build
 		const originModule = await discoverModule(cwd);
@@ -87,7 +89,7 @@ export async function build(cwd: string = process.cwd()) {
 			})
 			: singleTree(originModule);
 
-		const status = createStatusReporter(tree.root);
+		status = createStatusReporter(tree.root);
 
 		// get the target environment
 		const targetEnv: TargetEnv = process.env.BUILD_ENV
@@ -137,7 +139,7 @@ export async function build(cwd: string = process.cwd()) {
 							}
 
 							if (level !== "debug") {
-								status.log(currentNode, log.message);
+								status!.log(currentNode, log.message);
 							}
 						},
 					});
@@ -166,9 +168,11 @@ export async function build(cwd: string = process.cwd()) {
 	}
 	finally {
 		currentTasks = null;
+		status?.close();
 
 		const buildTimeTaken = Date.now() - buildStartTime;
-		print(`\nDone in ${formatTime(buildTimeTaken)}!\n`);
+		println();
+		println(`Done in ${formatTime(buildTimeTaken)}!`);
 	}
 }
 
