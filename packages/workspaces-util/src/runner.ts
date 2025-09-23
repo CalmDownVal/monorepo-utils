@@ -16,11 +16,11 @@ export function runCommand(
 	return new Promise((resolve, reject) => {
 		const proc = spawn(command, args, {
 			cwd,
-			stdio: 'inherit',
+			stdio: "inherit",
 		});
 
-		proc.on('error', reject);
-		proc.on('exit', code => {
+		proc.on("error", reject);
+		proc.on("exit", code => {
 			if (code === 0) {
 				resolve();
 			}

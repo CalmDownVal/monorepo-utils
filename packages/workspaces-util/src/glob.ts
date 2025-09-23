@@ -210,8 +210,8 @@ function resolveWildcardSegment(
 	});
 }
 
-const WILD_SINGLE = '?';
-const WILD_MANY = '*';
+const WILD_SINGLE = "?";
+const WILD_MANY = "*";
 
 function matchesPattern(pattern: readonly string[], input: string): boolean {
 	const patternLength = pattern.length;
