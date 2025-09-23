@@ -6,7 +6,7 @@ import { discoverModule, discoverWorkspace, getDependencies, type GraphNode, typ
 import { rollup, type InputOptions, type OutputOptions } from "rollup";
 
 import type { Configurator } from "./Entity";
-import { createStatusReporter, formatTime, print } from "./StatusReporter";
+import { createStatusReporter, formatTime, print } from "./status";
 
 export interface BuildContext {
 	readonly cwd: string;
@@ -87,7 +87,7 @@ export async function build(cwd: string = process.cwd()) {
 			})
 			: singleTree(originModule);
 
-		const status = createStatusReporter(tree.root, "queued");
+		const status = createStatusReporter(tree.root);
 
 		// get the target environment
 		const targetEnv: TargetEnv = process.env.BUILD_ENV
@@ -97,7 +97,7 @@ export async function build(cwd: string = process.cwd()) {
 		// build!
 		for (const currentNode of tree.buildOrder) {
 			const moduleStartTime = Date.now();
-			status.update(currentNode, { kind: "pending" });
+			status.update(currentNode, { kind: "BUSY" });
 
 			const context: BuildContext = {
 				cwd: currentNode.module.baseDir,
@@ -112,7 +112,7 @@ export async function build(cwd: string = process.cwd()) {
 
 				const buildConfigPath = join(context.cwd, "build.config.mjs");
 				if (!(await canAccessFile(buildConfigPath))) {
-					status.update(currentNode, { kind: "skipped" });
+					status.update(currentNode, { kind: "SKIP" });
 					continue;
 				}
 
@@ -149,14 +149,14 @@ export async function build(cwd: string = process.cwd()) {
 
 				const moduleTimeTaken = Date.now() - moduleStartTime;
 				status.update(currentNode, {
-					kind: "success",
+					kind: "PASS",
 					timeMs: moduleTimeTaken,
 				});
 			}
 			catch (ex) {
 				const moduleTimeTaken = Date.now() - moduleStartTime;
 				status.update(currentNode, {
-					kind: "error",
+					kind: "FAIL",
 					timeMs: moduleTimeTaken,
 				});
 

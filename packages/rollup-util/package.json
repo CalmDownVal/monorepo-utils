@@ -1,6 +1,6 @@
 {
 	"name": "@calmdownval/rollup-util",
-	"version": "1.0.0-alpha.4",
+	"version": "1.0.0-alpha.5",
 	"license": "ISC",
 	"exports": {
 		".": {
@@ -12,15 +12,15 @@
 		"dist"
 	],
 	"peerDependencies": {
-		"@calmdownval/workspaces-util": "1.0.0-alpha.4",
-		"rollup": "^4.50.2"
+		"@calmdownval/workspaces-util": "1.0.0-alpha.5",
+		"rollup": "^4.52.2"
 	},
 	"devDependencies": {
 		"@calmdownval/workspaces-util": "workspace:*",
 		"@rollup/plugin-terser": "0.4.4",
 		"@rollup/plugin-typescript": "12.1.4",
-		"@types/node": "24.4.0",
-		"rollup": "4.50.2",
+		"@types/node": "24.5.2",
+		"rollup": "4.52.2",
 		"rollup-plugin-delete": "3.0.1",
 		"rollup-plugin-dts": "6.2.3",
 		"rollup-plugin-node-externals": "8.1.1",
