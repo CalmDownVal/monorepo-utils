@@ -95,10 +95,6 @@ export async function build(
 	// detect watch mode
 	const isWatching = args.some(arg => /^--watch$/i.test(arg));
 	const watchers: RollupWatcher[] = [];
-	const watchOptions: WatcherOptions = {
-		buildDelay: 500,
-		clearScreen: false,
-	};
 
 	// debug mode
 	const isDebug = args.some(arg => /^--debug$/i.test(arg));
@@ -158,74 +154,27 @@ export async function build(
 
 				// build targets sequentially
 				for (const target of targets) {
-					const inputOptions: InputOptions = {
-						...target.input,
-						onLog(level, log) {
-							if (log.code !== undefined && target.suppressed.has(log.code)) {
-								return;
-							}
-
-							if (level !== "debug" || isDebug) {
-								status!.log(currentNode, log.message);
-							}
-						},
-					};
-
-					if (isWatching) {
-						const watcherStarted = new Promise<void>((resolve, reject) => {
-							let isFirstRun = true;
-							const watcher = watch({
-								...inputOptions,
-								output: target.outputs as OutputOptions[],
-								watch: watchOptions,
-							});
-
-							watchers.push(watcher);
-							watcher.on("event", async (e) => {
-								switch (e.code) {
-									case "BUNDLE_START":
-										moduleStartTime = Date.now();
-										status!.update(currentNode, { kind: "BUSY" });
-										break;
-
-									case "BUNDLE_END":
-										await e.result.close();
-										bundleFinished(status!, currentNode, moduleStartTime, "PASS");
-										if (isFirstRun) {
-											resolve();
-											isFirstRun = false;
-										}
-
-										break;
-
-									case "ERROR":
-										bundleFinished(status!, currentNode, moduleStartTime, "FAIL");
-										if (isFirstRun) {
-											reject(e.error);
-											isFirstRun = false;
-										}
-										else {
-											status!.log(currentNode, isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
-										}
-
-										break;
+					await (isWatching ? buildAndWatch : buildOnce)({
+						context,
+						status,
+						node: currentNode,
+						outputs: target.outputs,
+						inputOptions: {
+							...target.input,
+							onLog(level, log) {
+								if (log.code !== undefined && target.suppressed.has(log.code)) {
+									return;
 								}
-							});
-						});
 
-						await watcherStarted;
-					}
-					else {
-						status.update(currentNode, { kind: "BUSY" });
-
-						const bundle = await rollup(inputOptions);
-						for (const output of target.outputs) {
-							await bundle.write(output);
-						}
-
-						await bundle.close();
-						bundleFinished(status, currentNode, moduleStartTime, "PASS");
-					}
+								if (level !== "debug" || isDebug) {
+									status!.log(currentNode, log.message);
+								}
+							},
+						},
+						registerWatcher: (watcher) => {
+							watchers.push(watcher);
+						},
+					});
 				}
 			}
 			catch (ex: any) {
@@ -235,17 +184,15 @@ export async function build(
 		}
 
 		// watch mode suspend
-		if (!isWatching) {
-			return;
-		}
-
-		await new Promise<void>((resolve) => {
-			process.on("SIGINT", () => {
-				Promise
-					.allSettled(watchers.map((it) => it.removeAllListeners().close()))
-					.finally(resolve);
+		if (isWatching) {
+			await new Promise<void>((resolve) => {
+				process.on("SIGINT", () => {
+					Promise
+						.allSettled(watchers.map((it) => it.removeAllListeners().close()))
+						.finally(resolve);
+				});
 			});
-		});
+		}
 	}
 	finally {
 		currentTasks = null;
@@ -255,6 +202,76 @@ export async function build(
 		println();
 		println(`Done in ${formatTime(buildTimeTaken)}!`);
 	}
+}
+
+interface BuildCall {
+	readonly context: BuildContext;
+	readonly node: GraphNode;
+	readonly inputOptions: InputOptions;
+	readonly outputs: readonly OutputOptions[];
+	readonly status: StatusReporter;
+	readonly registerWatcher?: (watcher: RollupWatcher) => void;
+}
+
+async function buildOnce({ node, inputOptions, outputs, status }: BuildCall) {
+	const startTime = Date.now();
+	status.update(node, { kind: "BUSY" });
+
+	const bundle = await rollup(inputOptions);
+	for (const output of outputs) {
+		await bundle.write(output);
+	}
+
+	await bundle.close();
+	bundleFinished(status, node, startTime, "PASS");
+}
+
+function buildAndWatch({ context, node, inputOptions, outputs, status, registerWatcher }: BuildCall) {
+	return new Promise<void>((resolve, reject) => {
+		let isFirstRun = true;
+		let startTime = 0;
+		const watcher = watch({
+			...inputOptions,
+			output: outputs as OutputOptions[],
+			watch: {
+				buildDelay: 50,
+				clearScreen: false,
+			},
+		});
+
+		registerWatcher?.(watcher);
+		watcher.on("event", async (e) => {
+			switch (e.code) {
+				case "BUNDLE_START":
+					startTime = Date.now();
+					process.chdir(context.cwd);
+					status!.update(node, { kind: "BUSY" });
+					break;
+
+				case "BUNDLE_END":
+					await e.result.close();
+					bundleFinished(status!, node, startTime, "PASS");
+					if (isFirstRun) {
+						resolve();
+						isFirstRun = false;
+					}
+
+					break;
+
+				case "ERROR":
+					bundleFinished(status!, node, startTime, "FAIL");
+					if (isFirstRun) {
+						reject(e.error);
+						isFirstRun = false;
+					}
+					else {
+						status!.log(node, context.isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
+					}
+
+					break;
+			}
+		});
+	});
 }
 
 function singleTree(module: Module): TraversalResult {
