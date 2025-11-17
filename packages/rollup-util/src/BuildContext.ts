@@ -13,6 +13,7 @@ export interface BuildContext {
 	readonly moduleName: string;
 	readonly targetEnv: TargetEnv;
 	readonly isWatching: boolean;
+	readonly isDebug: boolean;
 }
 
 export type TargetEnv =
@@ -99,6 +100,9 @@ export async function build(
 		clearScreen: false,
 	};
 
+	// debug mode
+	const isDebug = args.some(arg => /^--debug$/i.test(arg));
+
 	try {
 		// get the origin module to build
 		const originModule = await discoverModule(cwd);
@@ -126,6 +130,7 @@ export async function build(
 				moduleName: currentNode.module.declaration.name,
 				targetEnv,
 				isWatching,
+				isDebug,
 			};
 
 			try {
@@ -160,7 +165,7 @@ export async function build(
 								return;
 							}
 
-							if (level !== "debug") {
+							if (level !== "debug" || isDebug) {
 								status!.log(currentNode, log.message);
 							}
 						},
@@ -188,7 +193,7 @@ export async function build(
 
 								case "ERROR":
 									bundleFinished(status!, currentNode, moduleStartTime, "FAIL");
-									status!.log(currentNode, e.error.toString());
+									status!.log(currentNode, isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
 									break;
 							}
 						});
@@ -206,9 +211,9 @@ export async function build(
 					}
 				}
 			}
-			catch (ex) {
+			catch (ex: any) {
 				bundleFinished(status, currentNode, moduleStartTime, "FAIL");
-				status.log(currentNode, (ex as Error).toString());
+				status.log(currentNode, isDebug ? ex.stack ?? ex.toString() : ex.toString());
 			}
 		}
 
