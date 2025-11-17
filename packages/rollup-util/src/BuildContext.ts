@@ -172,31 +172,48 @@ export async function build(
 					};
 
 					if (isWatching) {
-						const watcher = watch({
-							...inputOptions,
-							output: target.outputs as OutputOptions[],
-							watch: watchOptions,
+						const watcherStarted = new Promise<void>((resolve, reject) => {
+							let isFirstRun = true;
+							const watcher = watch({
+								...inputOptions,
+								output: target.outputs as OutputOptions[],
+								watch: watchOptions,
+							});
+
+							watchers.push(watcher);
+							watcher.on("event", async (e) => {
+								switch (e.code) {
+									case "BUNDLE_START":
+										moduleStartTime = Date.now();
+										status!.update(currentNode, { kind: "BUSY" });
+										break;
+
+									case "BUNDLE_END":
+										await e.result.close();
+										bundleFinished(status!, currentNode, moduleStartTime, "PASS");
+										if (isFirstRun) {
+											resolve();
+											isFirstRun = false;
+										}
+
+										break;
+
+									case "ERROR":
+										bundleFinished(status!, currentNode, moduleStartTime, "FAIL");
+										if (isFirstRun) {
+											reject(e.error);
+											isFirstRun = false;
+										}
+										else {
+											status!.log(currentNode, isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
+										}
+
+										break;
+								}
+							});
 						});
 
-						watchers.push(watcher);
-						watcher.on("event", async (e) => {
-							switch (e.code) {
-								case "BUNDLE_START":
-									moduleStartTime = Date.now();
-									status!.update(currentNode, { kind: "BUSY" });
-									break;
-
-								case "BUNDLE_END":
-									await e.result.close();
-									bundleFinished(status!, currentNode, moduleStartTime, "PASS");
-									break;
-
-								case "ERROR":
-									bundleFinished(status!, currentNode, moduleStartTime, "FAIL");
-									status!.log(currentNode, isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
-									break;
-							}
-						});
+						await watcherStarted;
 					}
 					else {
 						status.update(currentNode, { kind: "BUSY" });
