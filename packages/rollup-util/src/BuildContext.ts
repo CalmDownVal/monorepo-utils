@@ -186,11 +186,19 @@ export async function build(
 		// watch mode suspend
 		if (isWatching) {
 			await new Promise<void>((resolve) => {
-				process.on("SIGINT", () => {
+				let isTearingDown = false;
+				const onTeardown = () => {
+					if (isTearingDown) {
+						return;
+					}
+
+					isTearingDown = true;
 					Promise
-						.allSettled(watchers.map((it) => it.removeAllListeners().close()))
+						.allSettled(watchers.map((it) => it.close()))
 						.finally(resolve);
-				});
+				};
+
+				[ "SIGTERM", "SIGINT" ].forEach(signal => process.on(signal, onTeardown));
 			});
 		}
 	}
