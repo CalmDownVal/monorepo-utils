@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { glob, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { identity, isENOENT } from "./common";
-import { resolveGlob } from "./glob";
+import { isENOENT } from "./common";
 import type { Module, Workspace } from "./types";
 
 export interface DiscoverOptions {
@@ -34,7 +33,7 @@ export async function discoverWorkspace(options?: DiscoverOptions): Promise<Work
 
 	while (depth <= maxDepth) {
 		root = await discoverModule(cwd);
-		if (root?.declaration.workspaces) {
+		if (root?.package.workspaces) {
 			break;
 		}
 
@@ -47,17 +46,17 @@ export async function discoverWorkspace(options?: DiscoverOptions): Promise<Work
 		depth += 1;
 	}
 
-	if (!root?.declaration.workspaces) {
+	if (!root?.package.workspaces) {
 		return null;
 	}
 
 	const globOptions = { cwd };
-	const paths = (
-		await Promise.all(
-			root.declaration.workspaces.map(it => resolveGlob(it, globOptions))
-		)
-	)
-		.flatMap(identity);
+	const paths: string[] = [];
+	for (const pattern of root.package.workspaces) {
+		for await (const path of glob(pattern, globOptions)) {
+			paths.push(join(cwd, path));
+		}
+	}
 
 	const modules = (
 		await Promise.all(
@@ -94,7 +93,7 @@ export async function discoverModule(dir: string): Promise<Module | null> {
 	try {
 		return {
 			baseDir: dir,
-			declaration: JSON.parse(json),
+			package: JSON.parse(json),
 		};
 	}
 	catch (ex) {
@@ -108,11 +107,11 @@ export async function discoverModule(dir: string): Promise<Module | null> {
  * Gets a workspace module by name, or null if not found.
  */
 export function getModuleOrNull(workspace: Workspace, moduleName: string): Module | null {
-	if (workspace.root.declaration.name === moduleName) {
+	if (workspace.root.package.name === moduleName) {
 		return workspace.root;
 	}
 
-	return workspace.modules.find(it => it.declaration.name === moduleName) ?? null;
+	return workspace.modules.find(it => it.package.name === moduleName) ?? null;
 }
 
 /**

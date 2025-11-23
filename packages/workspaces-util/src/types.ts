@@ -5,7 +5,7 @@ export interface Workspace {
 
 export interface Module {
 	baseDir: string;
-	declaration: PackageDeclaration;
+	package: PackageDeclaration;
 }
 
 export interface PackageDeclaration {

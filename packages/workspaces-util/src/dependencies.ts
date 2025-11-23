@@ -16,13 +16,17 @@ export interface DependencyTraversal {
 }
 
 export interface TraversalResult {
-	buildOrder: GraphNode[];
-	root: GraphNode;
+	orderedNodes: GraphNode[];
+	origin: GraphNode;
 }
 
 export interface GraphNode {
 	module: Module;
+
+	/** list of modules this module depends on */
 	dependencies: GraphNode[];
+
+	/** list of modules that depend on this module */
 	dependents: GraphNode[];
 
 	/** @internal */
@@ -31,18 +35,6 @@ export interface GraphNode {
 	/** @internal */
 	visiting?: boolean;
 }
-
-/**
- * Builds an ordered list of other workspace modules that are either direct or
- * indirect dependency of the queried module.
- */
-export const getDependencies = createTraversal("dependencies", "push");
-
-/**
- * Builds an ordered list of workspace modules that either directly or
- * indirectly depend on the queried workspace.
- */
-export const getDependents = createTraversal("dependents", "unshift");
 
 export type DependencyMapKey =
 	| "dependencies"
@@ -68,7 +60,7 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 
 	for (; moduleIndex < moduleCount; moduleIndex += 1) {
 		module = modules[moduleIndex];
-		graph[module.declaration.name] = {
+		graph[module.package.name] = {
 			module,
 			dependencies: [],
 			dependents: [],
@@ -90,20 +82,20 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 
 	for (moduleIndex = 0; moduleIndex < moduleCount; moduleIndex += 1) {
 		module = modules[moduleIndex];
-		if (excluded[module.declaration.name] === true) {
+		if (excluded[module.package.name] === true) {
 			continue;
 		}
 
-		upstream = graph[module.declaration.name]!;
+		upstream = graph[module.package.name]!;
 		for (mapIndex = 0; mapIndex < mapCount; mapIndex += 1) {
-			if (!(dependencyMap = module.declaration[mapKeys[mapIndex]])) {
+			if (!(dependencyMap = module.package[mapKeys[mapIndex]])) {
 				continue;
 			}
 
 			for (moduleSubIndex = 0; moduleSubIndex < moduleCount; moduleSubIndex += 1) {
-				downstream = graph[modules[moduleSubIndex].declaration.name]!;
-				if (excluded[downstream.module.declaration.name] === true ||
-					dependencyMap[downstream.module.declaration.name]?.startsWith("workspace:") !== true
+				downstream = graph[modules[moduleSubIndex].package.name]!;
+				if (excluded[downstream.module.package.name] === true ||
+					dependencyMap[downstream.module.package.name]?.startsWith("workspace:") !== true
 				) {
 					continue;
 				}
@@ -117,10 +109,7 @@ function buildGraph(workspace: Workspace, options?: GraphOptions): Graph {
 	return graph;
 }
 
-function createTraversal(
-	branchKey: "dependencies" | "dependents",
-	direction: "push" | "unshift",
-): DependencyTraversal {
+function createTraversal(isUpwards: boolean): DependencyTraversal {
 	return options => {
 		const graph = buildGraph(options.workspace, options);
 		const origin = graph[options.moduleName];
@@ -128,7 +117,8 @@ function createTraversal(
 			throw new Error(`No module '${options.moduleName}' could be found in the workspace.`);
 		}
 
-		const buildOrder: GraphNode[] = [];
+		const affected = new WeakSet<GraphNode>();
+		const orderedNodes: GraphNode[] = [];
 		let cycleStart: GraphNode | null = null;
 		let cycleInfo = "";
 
@@ -139,21 +129,21 @@ function createTraversal(
 
 			if (node.visiting) {
 				cycleStart = node;
-				cycleInfo = node.module.declaration.name;
+				cycleInfo = node.module.package.name;
 				return false;
 			}
 
 			node.visiting = true;
 
-			const branch = node[branchKey];
+			const relatives = isUpwards ? node.dependents : node.dependencies;
 			let index = 0;
-			for (; index < branch.length; index += 1) {
-				if (!visit(branch[index])) {
+			for (; index < relatives.length; index += 1) {
+				if (!visit(relatives[index])) {
 					if (cycleStart === node) {
 						throw new Error(`Dependency cycle found: [-> ${cycleInfo} ->]`);
 					}
 
-					cycleInfo += ` -> ${node.module.declaration.name}`;
+					cycleInfo += ` -> ${node.module.package.name}`;
 					return false;
 				}
 			}
@@ -162,7 +152,8 @@ function createTraversal(
 			node.visited = true;
 
 			if (node !== origin || options.includeSelf !== false) {
-				buildOrder[direction](node);
+				orderedNodes.push(node);
+				affected.add(node);
 			}
 
 			return true;
@@ -171,20 +162,31 @@ function createTraversal(
 		visit(origin);
 
 		// filter the results to the requested scope
-		const affected = new WeakSet<GraphNode>();
-		buildOrder.forEach(node => {
-			affected.add(node);
-		});
-
 		const isAffected = (node: GraphNode) => affected.has(node);
-		buildOrder.forEach(node => {
+		orderedNodes.forEach(node => {
 			node.dependencies = node.dependencies.filter(isAffected);
 			node.dependents = node.dependents.filter(isAffected);
 		});
 
+		if (isUpwards) {
+			orderedNodes.reverse();
+		}
+
 		return {
-			buildOrder,
-			root: origin,
+			orderedNodes,
+			origin,
 		};
 	};
 }
+
+/**
+ * Builds an ordered list of other workspace modules that are either direct or
+ * indirect dependency of the queried module.
+ */
+export const getDependencies = createTraversal(/* isUpwards = */ false);
+
+/**
+ * Builds an ordered list of workspace modules that either directly or
+ * indirectly depend on the queried workspace.
+ */
+export const getDependents = createTraversal(/* isUpwards = */ true);

@@ -24,7 +24,7 @@ export type Entity<TName extends string, TConfig extends object, TBase = {}> = T
 	): Entity<TName, TConfig, TBase>;
 
 	configure(
-		configurator: Configurator<TConfig>,
+		configurator: TConfig | Configurator<TConfig>,
 	): Entity<TName, TConfig, TBase>;
 }
 
@@ -126,13 +126,19 @@ function onDisable(
 
 function onConfigure(
 	this: AnyEntity,
-	configurator: Configurator<any>,
+	configurator: any, // | Configurator<any>,
 ): AnyEntity {
 	const prev = this.getConfig;
-	const next: Configurator<any> = async (currentConfig, context) => ({
-		...currentConfig,
-		...(await configurator(await prev(currentConfig, context), context)),
-	});
+	const next: Configurator<any> = async (currentConfig, context) => {
+		if (typeof configurator !== "function") {
+			return {
+				...(await prev(currentConfig, context)),
+				...configurator,
+			};
+		}
+
+		return configurator(await prev(currentConfig, context), context);
+	};
 
 	if (this.isFinal) {
 		this.getConfig = next;

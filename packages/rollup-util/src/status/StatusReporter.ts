@@ -1,8 +1,9 @@
 import type { GraphNode } from "@calmdownval/workspaces-util";
+import type { LogLevel as RollupLogLevel } from "rollup";
 
 export interface StatusReporter {
 	readonly root: GraphNode;
-	log(node: GraphNode, message: string): void;
+	log(node: GraphNode, message: string, level?: LogLevel): void;
 	update(node: GraphNode, status: StatusInfo): void;
 	close(): void;
 }
@@ -19,3 +20,5 @@ export type StatusKind =
 	| "IDLE"
 	| "PASS"
 	| "SKIP";
+
+export type LogLevel = RollupLogLevel | "error";

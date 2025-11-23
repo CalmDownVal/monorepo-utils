@@ -6,7 +6,7 @@ import { discoverModule, discoverWorkspace, getDependencies, type GraphNode, typ
 import { rollup, watch, type InputOptions, type OutputOptions, type RollupWatcher, type WatcherOptions } from "rollup";
 
 import type { Configurator } from "./Entity";
-import { createStatusReporter, formatTime, println, type StatusKind, type StatusReporter } from "./status";
+import { createStatusReporter, formatTime, overrideConsole, println, type StatusKind, type StatusReporter } from "./status";
 
 export interface BuildContext {
 	readonly cwd: string;
@@ -111,19 +111,20 @@ export async function build(
 		const tree = workspace
 			? getDependencies({
 				workspace,
-				moduleName: originModule.declaration.name,
+				moduleName: originModule.package.name,
 				exclude: [ "build-logic" ],
 			})
-			: singleTree(originModule);
+			: singleNode(originModule);
 
-		status = createStatusReporter(tree.root);
+		status = createStatusReporter(tree.origin);
+		overrideConsole(status);
 
 		// build!
-		for (const currentNode of tree.buildOrder) {
+		for (const currentNode of tree.orderedNodes) {
 			let moduleStartTime = Date.now();
 			const context: BuildContext = {
 				cwd: currentNode.module.baseDir,
-				moduleName: currentNode.module.declaration.name,
+				moduleName: currentNode.module.package.name,
 				targetEnv,
 				isWatching,
 				isDebug,
@@ -167,7 +168,7 @@ export async function build(
 								}
 
 								if (level !== "debug" || isDebug) {
-									status!.log(currentNode, log.message);
+									status!.log(currentNode, log.message, level);
 								}
 							},
 						},
@@ -179,7 +180,7 @@ export async function build(
 			}
 			catch (ex: any) {
 				bundleFinished(status, currentNode, moduleStartTime, "FAIL");
-				status.log(currentNode, isDebug ? ex.stack ?? ex.toString() : ex.toString());
+				status.log(currentNode, isDebug ? ex.stack ?? ex.toString() : ex.toString(), "error");
 			}
 		}
 
@@ -209,6 +210,7 @@ export async function build(
 		const buildTimeTaken = Date.now() - buildStartTime;
 		println();
 		println(`Done in ${formatTime(buildTimeTaken)}!`);
+		process.exit(0);
 	}
 }
 
@@ -250,18 +252,24 @@ function buildAndWatch({ context, node, inputOptions, outputs, status, registerW
 		registerWatcher?.(watcher);
 		watcher.on("event", async (e) => {
 			switch (e.code) {
-				case "BUNDLE_START":
+				case "START":
 					startTime = Date.now();
 					process.chdir(context.cwd);
 					status!.update(node, { kind: "BUSY" });
 					break;
 
+				case "BUNDLE_START":
+					break;
+
 				case "BUNDLE_END":
 					await e.result.close();
+					break;
+
+				case "END":
 					bundleFinished(status!, node, startTime, "PASS");
 					if (isFirstRun) {
-						resolve();
 						isFirstRun = false;
+						resolve();
 					}
 
 					break;
@@ -269,11 +277,11 @@ function buildAndWatch({ context, node, inputOptions, outputs, status, registerW
 				case "ERROR":
 					bundleFinished(status!, node, startTime, "FAIL");
 					if (isFirstRun) {
-						reject(e.error);
 						isFirstRun = false;
+						reject(e.error);
 					}
 					else {
-						status!.log(node, context.isDebug ? e.error.stack ?? e.error.toString() : e.error.toString());
+						status!.log(node, context.isDebug ? e.error.stack ?? e.error.toString() : e.error.toString(), "error");
 					}
 
 					break;
@@ -282,7 +290,7 @@ function buildAndWatch({ context, node, inputOptions, outputs, status, registerW
 	});
 }
 
-function singleTree(module: Module): TraversalResult {
+function singleNode(module: Module): TraversalResult {
 	const node: GraphNode = {
 		module,
 		dependencies: [],
@@ -290,8 +298,8 @@ function singleTree(module: Module): TraversalResult {
 	};
 
 	return {
-		buildOrder: [ node ],
-		root: node,
+		orderedNodes: [ node ],
+		origin: node,
 	};
 }
 

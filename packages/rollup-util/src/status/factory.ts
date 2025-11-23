@@ -2,7 +2,7 @@ import { EOL } from "node:os";
 
 import type { GraphNode } from "@calmdownval/workspaces-util";
 
-import type { StatusInfo, StatusKind, StatusReporter } from "./StatusReporter";
+import type { LogLevel, StatusInfo, StatusKind, StatusReporter } from "./StatusReporter";
 import { formatTime, print, println } from "./common";
 
 type StatusReporterExt = StatusReporter & {
@@ -47,6 +47,7 @@ const ANSI_GREEN = "0;32m";
 const ANSI_CYAN = "0;36m";
 const ANSI_YELLOW = "0;33m";
 const ANSI_HI_BLACK = "0;90m";
+const ANSI_WHITE = "0;37m";
 const ANSI_BOLD = "1m";
 
 const StatusColor: Record<StatusKind, string> = {
@@ -57,18 +58,30 @@ const StatusColor: Record<StatusKind, string> = {
 	SKIP: ANSI_YELLOW,
 };
 
-function onLog(this: StatusReporterExt, node: GraphNode, message: string) {
+const LogLevelColor: Record<LogLevel, string> = {
+	debug: ANSI_HI_BLACK,
+	info: ANSI_WHITE,
+	warn: ANSI_YELLOW,
+	error: ANSI_RED,
+};
+
+function onLog(this: StatusReporterExt, node: GraphNode, message: string, level: LogLevel = "info") {
 	this.clearTree();
 	if (this.lastLogNode !== node) {
-		const header = node.module.declaration.name;
+		const header = node.module.package.name;
 		println(this.ansi(header, ANSI_BOLD));
 		println(`┌${"─".repeat(header.length - 1)}`);
 
 		this.lastLogNode = node;
 	}
 
+	const formatted = message
+		.split(/(?:\r\n|\n|\r)+/g)
+		.map(line => this.ansi(line, LogLevelColor[level]))
+		.join(`${EOL}| `);
+
 	print("│ ");
-	println(message.replaceAll(/(\r\n|\n|\r)/g, `${EOL}│ `));
+	println(formatted);
 
 	if (!this.ci) {
 		this.printTree();
@@ -125,7 +138,7 @@ function onPrintTree(
 	let result;
 
 	let lineCount = 1;
-	let output = `${label} ${this.ansi(prefix + li0, ANSI_HI_BLACK)}${this.ansi(node.module.declaration.name, ANSI_BOLD)}${info}${EOL}`;
+	let output = `${label} ${this.ansi(prefix + li0, ANSI_HI_BLACK)}${this.ansi(node.module.package.name, ANSI_BOLD)}${info}${EOL}`;
 
 	for (; index < length; index += 1) {
 		isLast = index + 1 === length;
