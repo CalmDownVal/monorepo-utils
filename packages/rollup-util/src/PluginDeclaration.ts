@@ -6,6 +6,13 @@ import { createEntity, type Entity } from "./Entity";
 export interface PluginDeclaration<TName extends string, TConfig extends object> extends Entity<TName, TConfig> {
 	/** @internal */
 	readonly loadPlugin: PluginLoader<TConfig>;
+
+	/** @internal */
+	readonly suppressions: Set<string>;
+
+	suppress(
+		code: string,
+	): PluginDeclaration<TName, TConfig>;
 }
 
 export interface PluginLoader<TConfig extends object> {
@@ -20,5 +27,17 @@ export function declarePlugin<TName extends string, TConfig extends object>(
 	name: TName,
 	loadPlugin: PluginLoader<TConfig>,
 ): PluginDeclaration<TName, TConfig> {
-	return createEntity(name, { loadPlugin });
+	return createEntity(name, {
+		suppressions: new Set<string>(),
+		loadPlugin,
+		suppress: onSuppress,
+	});
+}
+
+function onSuppress(
+	this: AnyPluginDeclaration,
+	code: string,
+): AnyPluginDeclaration {
+	this.suppressions.add(code);
+	return this;
 }

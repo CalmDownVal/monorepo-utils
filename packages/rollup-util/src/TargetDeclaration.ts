@@ -1,6 +1,6 @@
 import type { OutputOptions, Plugin } from "rollup";
 
-import { buildTask, type BuildContext, type BuildTarget } from "./BuildContext";
+import { buildTask, LogSuppression, type BuildContext, type BuildTarget } from "./BuildContext";
 import { createEntity, type AnyEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
 import type { OutputConfig } from "./OutputDeclaration";
@@ -141,15 +141,16 @@ function onBuild(
 				return null;
 			}
 
+			const suppressions: LogSuppression[] = Array.from(pipeline.suppressions).map(code => ({ code }));
 			const pipelineConfig = await pipeline.getConfig(targetConfig, context);
-			const pipelinePlugins = await collectPlugins(pipeline.pluginContainer, context);
+			const pipelinePlugins = await collectPlugins(pipeline.pluginContainer, context, suppressions);
 			const pipelineOutputs = await pipeline.outputContainer.collect<OutputOptions>(async output => {
 				if (await isDisabled(output, context)) {
 					return null;
 				}
 
 				const outputConfig = await output.getConfig(pipelineConfig, context);
-				const outputPlugins = await collectPlugins(output.pluginContainer, context);
+				const outputPlugins = await collectPlugins(output.pluginContainer, context, suppressions);
 				return {
 					...outputConfig,
 					plugins: outputPlugins,
@@ -162,7 +163,7 @@ function onBuild(
 
 			return {
 				name: `${target.name} · ${pipeline.name}`,
-				suppressed: pipeline.suppressed,
+				suppressions,
 				outputs: pipelineOutputs,
 				input: {
 					input: target.entries,
@@ -189,6 +190,7 @@ async function isDisabled(
 function collectPlugins(
 	container: EntityContainer<AnyPluginDeclaration>,
 	context: BuildContext,
+	suppressions: LogSuppression[],
 ): Promise<Plugin[]> {
 	return container.collect(async plugin => {
 		if (await isDisabled(plugin, context)) {
@@ -197,6 +199,13 @@ function collectPlugins(
 
 		const pluginConfig = await plugin.getConfig(undefined, context);
 		const pluginFactory = await plugin.loadPlugin(context);
-		return pluginFactory(pluginConfig);
+		const rollupPlugin = pluginFactory(pluginConfig);
+
+		plugin.suppressions.forEach(code => suppressions.push({
+			code,
+			plugin: rollupPlugin.name,
+		}));
+
+		return rollupPlugin;
 	});
 }

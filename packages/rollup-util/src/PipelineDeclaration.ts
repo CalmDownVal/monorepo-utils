@@ -18,21 +18,21 @@ export type PipelineDeclaration<
 	/** @internal */
 	readonly outputContainer: EntityContainer<AnyOutputDeclaration, TOutputs>;
 
-	/** @interface */
-	readonly suppressed: Set<string>;
+	/** @internal */
+	readonly suppressions: Set<string>;
 
 	plugin<TPlugin extends AnyPluginDeclaration>(
 		plugin: TPlugin,
 	): PipelineDeclaration<TName, TConfig, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }, TOutputs>;
 
-	suppress(
-		code: string,
-	): PipelineDeclaration<TName, TConfig, TPlugins, TOutputs>;
-
 	output<TOutputName extends string, TOutput extends AnyOutputDeclaration>(
 		name: TOutputName,
 		block?: (output: OutputDeclaration<TOutputName, TConfig, {}>) => TOutput,
 	): PipelineDeclaration<TName, TConfig, TPlugins, TOutputs & { [K in NameOf<TOutput>]: TOutput }>;
+
+	suppress(
+		code: string,
+	): PipelineDeclaration<TName, TConfig, TPlugins, TOutputs>;
 }>;
 
 export type AnyPipelineDeclaration = (
@@ -47,13 +47,13 @@ export function declarePipeline<TName extends string, TConfig extends OutputConf
 	return createEntity(name, {
 		plugins: pluginContainer.entityMap,
 		outputs: outputContainer.entityMap,
-		suppressed: new Set(),
 		pluginContainer,
 		outputContainer,
+		suppressions: new Set(),
 		finalize: onFinalize,
 		plugin: onPlugin,
-		suppress: onSuppress,
 		output: onOutput,
+		suppress: onSuppress,
 	});
 }
 
@@ -89,14 +89,6 @@ function onPlugin(
 	};
 }
 
-function onSuppress(
-	this: AnyPipelineDeclaration,
-	code: string,
-): AnyPipelineDeclaration {
-	this.suppressed.add(code);
-	return this;
-}
-
 function onOutput(
 	this: AnyPipelineDeclaration,
 	name: string,
@@ -117,4 +109,12 @@ function onOutput(
 		outputs: outputContainer.entityMap,
 		outputContainer,
 	};
+}
+
+function onSuppress(
+	this: AnyPipelineDeclaration,
+	code: string,
+): AnyPipelineDeclaration {
+	this.suppressions.add(code);
+	return this;
 }

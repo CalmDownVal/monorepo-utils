@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { discoverModule, discoverWorkspace, getDependencies, type GraphNode, type Module, type TraversalResult } from "@calmdownval/workspaces-util";
-import { rollup, watch, type InputOptions, type OutputOptions, type RollupWatcher, type WatcherOptions } from "rollup";
+import { rollup, watch, type InputOptions, type OutputOptions, type RollupWatcher } from "rollup";
 
 import type { Configurator } from "./Entity";
 import { createStatusReporter, formatTime, overrideConsole, println, type StatusKind, type StatusReporter } from "./status";
@@ -29,9 +29,15 @@ export function inEnv(...envs: TargetEnv[]): Configurator<boolean> {
 /** @internal */
 export interface BuildTarget {
 	readonly name: string;
-	readonly suppressed: Set<string>;
 	readonly input: InputOptions;
 	readonly outputs: readonly OutputOptions[];
+	readonly suppressions: readonly LogSuppression[];
+}
+
+/** @internal */
+export interface LogSuppression {
+	readonly code: string;
+	readonly plugin?: string;
 }
 
 /** @internal */
@@ -75,7 +81,7 @@ export async function build(
 	args: readonly string[] = process.argv.slice(2),
 ) {
 	const buildStartTime = Date.now();
-	let status: StatusReporter | undefined;
+	let status!: StatusReporter;
 
 	// detect environment
 	const targetEnv: TargetEnv = (() => {
@@ -163,12 +169,13 @@ export async function build(
 						inputOptions: {
 							...target.input,
 							onLog(level, log) {
-								if (log.code !== undefined && target.suppressed.has(log.code)) {
+								const isSuppressed = log.code !== undefined && target.suppressions.some(it => it.code === log.code && (!it.plugin || it.plugin === log.plugin));
+								if (isSuppressed) {
 									return;
 								}
 
 								if (level !== "debug" || isDebug) {
-									status!.log(currentNode, log.message, level);
+									status.log(currentNode, log.message, level);
 								}
 							},
 						},
@@ -205,7 +212,7 @@ export async function build(
 	}
 	finally {
 		currentTasks = null;
-		status?.close();
+		status.close();
 
 		const buildTimeTaken = Date.now() - buildStartTime;
 		println();
