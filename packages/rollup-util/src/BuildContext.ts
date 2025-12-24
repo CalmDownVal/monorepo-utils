@@ -169,7 +169,7 @@ export async function build(
 						inputOptions: {
 							...target.input,
 							onLog(level, log) {
-								const isSuppressed = log.code !== undefined && target.suppressions.some(it => it.code === log.code && (!it.plugin || it.plugin === log.plugin));
+								const isSuppressed = log.pluginCode !== undefined && target.suppressions.some(it => it.code === log.pluginCode && (!it.plugin || it.plugin === log.plugin));
 								if (isSuppressed) {
 									return;
 								}
