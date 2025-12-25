@@ -3,7 +3,7 @@ import type { PluginImpl } from "rollup";
 import type { BuildContext } from "./BuildContext";
 import { createEntity, type Entity } from "./Entity";
 
-export interface PluginDeclaration<TName extends string, TConfig extends object> extends Entity<TName, TConfig> {
+export type PluginDeclaration<TName extends string, TConfig extends object> = Entity<TName, TConfig, {
 	/** @internal */
 	readonly loadPlugin: PluginLoader<TConfig>;
 
@@ -13,7 +13,7 @@ export interface PluginDeclaration<TName extends string, TConfig extends object>
 	suppress(
 		code: string,
 	): PluginDeclaration<TName, TConfig>;
-}
+}>;
 
 export interface PluginLoader<TConfig extends object> {
 	(context: BuildContext): Promise<PluginImpl<TConfig>>;

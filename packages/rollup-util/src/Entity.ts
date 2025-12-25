@@ -131,10 +131,10 @@ function onConfigure(
 	const prev = this.getConfig;
 	const next: Configurator<any> = async (currentConfig, context) => {
 		if (typeof configurator !== "function") {
-			return {
-				...(await prev(currentConfig, context)),
-				...configurator,
-			};
+			return mergeDeep(
+				await prev(currentConfig, context),
+				configurator,
+			);
 		}
 
 		return configurator(await prev(currentConfig, context), context);
@@ -149,4 +149,25 @@ function onConfigure(
 		...this,
 		getConfig: next,
 	};
+}
+
+function mergeDeep(prev: unknown, next: unknown) {
+	if (!isPlainObject(prev) || !isPlainObject(next)) {
+		return next;
+	}
+
+	const result = { ...prev };
+
+	let key;
+	for (key in next) {
+		if (Object.hasOwn(next, key)) {
+			result[key] = mergeDeep(prev[key], next[key]);
+		}
+	}
+
+	return result;
+}
+
+function isPlainObject(value: unknown): value is { [K in PropertyKey]?: unknown } {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
 }

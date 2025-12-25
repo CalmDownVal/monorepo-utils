@@ -175,7 +175,7 @@ export async function build(
 								}
 
 								if (level !== "debug" || isDebug) {
-									status.log(currentNode, log.message, level);
+									status.log(currentNode, `${log.pluginCode ? `[${log.pluginCode}]` : ""}${log.message}`, level);
 								}
 							},
 						},
