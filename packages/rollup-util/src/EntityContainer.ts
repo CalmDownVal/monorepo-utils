@@ -43,6 +43,7 @@ function onFinalize(
 	return {
 		...this,
 		isFinal: true,
+		entityOrder: [ ...this.entityOrder ],
 		entityMap: this.entityOrder.reduce<Mutable<EntityMap<AnyEntity>>>((map, key) => {
 			map[key] = this.entityMap[key].finalize();
 			return map;
