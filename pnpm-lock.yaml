@@ -29,9 +29,18 @@ importers:
 
   .:
     devDependencies:
+      build-logic:
+        specifier: 'workspace:'
+        version: link:build-logic
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  build-logic:
+    devDependencies:
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
 
   packages/rolldown-workspace:
     dependencies:

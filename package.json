@@ -1,8 +1,9 @@
 {
 	"name": "@calmdown/rollup-workspace-monorepo",
 	"private": true,
-	"packageManager": "pnpm@11.15.1",
+	"packageManager": "pnpm@11.17.0",
 	"devDependencies": {
+		"build-logic": "workspace:",
 		"typescript": "catalog:"
 	}
 }

@@ -50,7 +50,7 @@ available throughout all workspaces.
     "packages/*"
   ],
   "devDependencies": {
-    "build-logic": "workspace:*"
+    "build-logic": "workspace:"
   }
 }
 ```
@@ -149,7 +149,7 @@ dependency on `build-logic` and provides a `build.config.js` script:
 {
   "name": "package-1",
   "devDependencies": {
-    "build-logic": "workspace:*"
+    "build-logic": "workspace:"
   }
 }
 ```

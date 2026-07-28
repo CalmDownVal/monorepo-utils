@@ -1,0 +1,12 @@
+{
+	"name": "build-logic",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"versions": "./bin/versions.js"
+	},
+	"devDependencies": {
+		"yaml": "catalog:"
+	}
+}
