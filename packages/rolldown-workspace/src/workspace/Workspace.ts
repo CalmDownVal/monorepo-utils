@@ -82,7 +82,7 @@ export class Workspace {
 
 			// look for a "pnpm-workspace.yaml" file in the same directory (PNPM flavor)
 			try {
-				const yaml = await fs.readFile(Path.join(cwd, "pnpm-workspace.yaml"), "utf8");
+				const yaml = await fs.readFile(Path.join(pkg.directory, "pnpm-workspace.yaml"), "utf8");
 				const pnpm = parseYAML(yaml, YAML_PARSE_OPTIONS);
 				if (isArrayOf(pnpm.packages, isString)) {
 					root = pkg;
