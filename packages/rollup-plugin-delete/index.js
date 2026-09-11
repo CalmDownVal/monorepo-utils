@@ -14,7 +14,8 @@ const PLUGIN_NAME = "Delete";
  * @typedef {Object} DeletePluginOptions
  * @property {(string|DeletePluginTarget)|(string|DeletePluginTarget)[]} targets desired delete operations
  * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
- * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
+ * @property {boolean} [runOnce=true] when in watch mode, controls whether to only execute targets on the first build (defaults to true)
+ * @property {boolean} [autoClean=false] when in watch mode, controls whether to automatically delete files left over from previous builds - never touches files that weren't emitted by the build pipeline (defaults to false)
  */
 
 /**
@@ -22,6 +23,8 @@ const PLUGIN_NAME = "Delete";
  */
 export default function DeletePlugin(pluginOptions) {
 	const targets = toArray(pluginOptions?.targets ?? []).map(it => typeof it === "string" ? { include: it } : it);
+	const runOnce = pluginOptions?.runOnce ?? true;
+	const autoClean = pluginOptions?.autoClean ?? false;
 
 	const exec = (context, message, block) => {
 		if (pluginOptions?.dryRun) {
@@ -77,10 +80,13 @@ export default function DeletePlugin(pluginOptions) {
 
 	let isFirstBeforeRun = true;
 	let isFirstAfterRun = true;
+	let previousBuildFiles = null;
+	let currentBuildFiles = null;
+
 	return {
 		name: PLUGIN_NAME,
 		async buildStart() {
-			if (pluginOptions?.runOnce !== false && !isFirstBeforeRun) {
+			if (runOnce && !isFirstBeforeRun) {
 				return;
 			}
 
@@ -94,17 +100,36 @@ export default function DeletePlugin(pluginOptions) {
 				}
 			}
 		},
-		async closeBundle() {
-			if (pluginOptions?.runOnce !== false && !isFirstAfterRun) {
+		writeBundle(options, bundle) {
+			if (!options.dir) {
 				return;
 			}
 
-			isFirstAfterRun = false;
+			const outDir = Path.resolve(options.dir);
 
-			const cwd = process.cwd();
-			for (const target of targets) {
-				if (target.trigger === "after") {
-					await execTarget(this, cwd, target);
+			previousBuildFiles = currentBuildFiles;
+			currentBuildFiles = new Set();
+
+			Object.keys(bundle).forEach(fileName => {
+				currentBuildFiles.add(Path.resolve(outDir, fileName));
+			});
+		},
+		async closeBundle() {
+			if (!runOnce || isFirstAfterRun) {
+				isFirstAfterRun = false;
+
+				const cwd = process.cwd();
+				for (const target of targets) {
+					if (target.trigger === "after") {
+						await execTarget(this, cwd, target);
+					}
+				}
+			}
+
+			if (autoClean && previousBuildFiles && currentBuildFiles) {
+				const staleFiles = previousBuildFiles.difference(currentBuildFiles);
+				for (const staleFile of staleFiles) {
+					await exec(this, `would delete stale file ${staleFile}`, () => FS.unlink(staleFile));
 				}
 			}
 		},

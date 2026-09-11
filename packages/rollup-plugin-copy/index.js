@@ -14,18 +14,18 @@ const EK_UNKNOWN = "unknown";
 
 /**
  * @typedef {Object} CopySingleTarget
- * @property {string} srcFile path to the file to be copied
- * @property {string} dstFile path to where the file should be copied to
- * @property {string} [baseDir] base directory for relative paths (defaults to current directory)
+ * @property {string} srcFile path to the file to be copied; relative paths resolve against the current directory
+ * @property {string} dstFile path to where the file should be copied to; relative paths resolve against the current directory
  * @property {"before"|"after"} [trigger="after"] when to run the operation (defaults to "after")
  */
 
 /**
  * @typedef {Object} CopyManyTarget
- * @property {string} dstDir directory to where files should be copied or linked
+ * @property {string} dstDir directory to where files should be copied or linked; relative paths resolve against the current directory
  * @property {string|string[]} include glob pattern(s) of files to include
  * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
- * @property {string} [baseDir] base directory for relative paths (defaults to current directory)
+ * @property {string} [baseDir] when set, directory structure under this path will be copied to dstDir, otherwise the structure is flattened; relative paths resolve against the current directory
+ * @property {string} [flatten=false] when to run the operation (defaults to "after")
  * @property {"before"|"after"} [trigger="after"] when to run the operation (defaults to "after")
  */
 
@@ -34,7 +34,7 @@ const EK_UNKNOWN = "unknown";
  * @property {(CopySingleTarget | CopyManyTarget)[]} targets desired copy/link operations
  * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
  * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
- * @property {"ignore"|"copy-file"|"link-absolute"|"link-relative"} [symLinks="ignore"] how to handle symlinks (defaults to "ignore")
+ * @property {"ignore"|"copy-file"|"link-relative"|"link-absolute"} [symLinks="ignore"] how to handle symlinks (defaults to "ignore")
  */
 
 /**
@@ -59,15 +59,14 @@ export default function CopyPlugin(pluginOptions) {
 	};
 
 	const execTarget = async (context, cwd, target) => {
-		const baseDir = target.baseDir ? Path.resolve(cwd, target.baseDir) : cwd;
 		const entries = [];
 		if (target.srcFile) {
 			// single file
-			const src = Path.resolve(baseDir, target.srcFile);
+			const src = Path.resolve(cwd, target.srcFile);
 			const stats = await FS.stat(src);
 			entries.push({
 				src,
-				dst: Path.resolve(baseDir, target.dstFile),
+				dst: Path.resolve(cwd, target.dstFile),
 				kind: getKind(stats),
 			});
 		}
@@ -80,12 +79,24 @@ export default function CopyPlugin(pluginOptions) {
 				withFileTypes: true,
 			};
 
-			const dstDir = Path.resolve(baseDir, target.dstDir);
+			const dstDir = Path.resolve(cwd, target.dstDir);
+			const baseDir = target.baseDir ? Path.resolve(cwd, target.baseDir) : null;
 			for (const includePattern of include) {
 				for await (const entry of FS.glob(includePattern, globOptions)) {
+					const src = Path.join(entry.parentPath, entry.name);
+					let dst = null;
+
+					if (baseDir) {
+						const rel = Path.relative(baseDir, src);
+						if (!rel.startsWith("..")) {
+							dst = Path.join(dstDir, rel);
+						}
+					}
+
+					dst ??= dst = Path.join(dstDir, entry.name);
 					entries.push({
-						src: Path.join(entry.parentPath, entry.name),
-						dst: Path.join(dstDir, entry.name),
+						src,
+						dst,
 						kind: getKind(entry),
 					});
 				}
